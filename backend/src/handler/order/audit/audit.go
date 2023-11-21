@@ -106,13 +106,13 @@ func FetchAuditOrder(c yee.Context) (err error) {
 				// user = "admin"
 				// println(u.Expr.Username)
 				u.Paging().OrderBy("(status = 2) DESC, date DESC").Select(QueryField).Query(
-					// common.AccordingToAllOrderState(u.Expr.Status),
+					common.AccordingToAllOrderState(u.Expr.Status),
 					common.AccordingToAllOrderType(u.Expr.Type),
 					common.AccordingToRelevant(user),
-					// common.AccordingToText(u.Expr.Text),
+					common.AccordingToText(u.Expr.Text),
 					common.AccordingToUsername(u.Expr.Username),
 					common.AccordingToDate(u.Expr.Picker),
-					// common.AccordingToWorkId(u.Expr.WorkId),
+					common.AccordingToWorkId(u.Expr.WorkId),
 				)
 				if err = websocket.Message.Send(ws, lib.ToJson(u.ToMessage())); err != nil {
 					c.Logger().Error(err)

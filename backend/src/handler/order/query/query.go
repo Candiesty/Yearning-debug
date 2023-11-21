@@ -1,6 +1,7 @@
 package query
 
 import (
+	"Yearning-go/src/attachment/dmessage"
 	"Yearning-go/src/handler/common"
 	"Yearning-go/src/handler/order/audit"
 	"Yearning-go/src/i18n"
@@ -53,7 +54,7 @@ func FetchQueryOrder(c yee.Context) (err error) {
 				}
 				is_record := token.Claims.(jwt.MapClaims)["is_record"].(bool)
 				name := token.Claims.(jwt.MapClaims)["name"].(string)
-
+				dmessage.PrintV(u)
 				u.Paging().OrderBy("(status = 2) DESC, date DESC").Query(
 					common.AccordingQueryToAssigned(c.QueryParam("tp") != "record" && is_record, name),
 					common.AccordingToUsername(u.Expr.Username),

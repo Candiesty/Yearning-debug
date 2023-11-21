@@ -1,6 +1,8 @@
 package audit
 
 import (
+	"Yearning-go/src/attachment/dengine"
+	"Yearning-go/src/attachment/dmessage"
 	"Yearning-go/src/engine"
 	"Yearning-go/src/handler/common"
 	"Yearning-go/src/handler/manage/tpl"
@@ -9,9 +11,10 @@ import (
 	"Yearning-go/src/model"
 	"encoding/json"
 	"fmt"
-	"github.com/cookieY/yee/logger"
 	"strings"
 	"time"
+
+	"github.com/cookieY/yee/logger"
 )
 
 type ExecArgs struct {
@@ -48,6 +51,9 @@ func (e *Confirm) GetTPL() []tpl.Tpl {
 	return tpl
 }
 
+var attachment_1 string
+
+// 执行SQL语句
 func ExecuteOrder(u *Confirm, user string) common.Resp {
 	var order model.CoreSqlOrder
 	var source model.CoreDataSource
@@ -59,27 +65,14 @@ func ExecuteOrder(u *Confirm, user string) common.Resp {
 	order.Assigned = user
 
 	model.DB().Model(model.CoreDataSource{}).Where("source_id =?", order.SourceId).First(&source)
-	rule, err := lib.CheckDataSourceRule(source.RuleId)
+	_, err := lib.CheckDataSourceRule(source.RuleId)
 	if err != nil {
 		logger.DefaultLogger.Error(err)
 	}
-
-	var isCall bool
-	if client := lib.NewRpc(); client != nil {
-		if err := client.Call("Engine.Exec", &ExecArgs{
-			Order:    &order,
-			Rules:    *rule,
-			IP:       source.IP,
-			Port:     source.Port,
-			Username: source.Username,
-			Password: lib.Decrypt(model.JWT, source.Password),
-			CA:       source.CAFile,
-			Cert:     source.Cert,
-			Key:      source.KeyFile,
-			Message:  model.GloMessage,
-		}, &isCall); err != nil {
-			return common.ERR_RPC
-		}
+	dmessage.PrintV("order execute", u, order)
+	//替换原表单状态，3为执行中
+	model.DB().Model(&model.CoreSqlOrder{}).Where("work_id =?", u.WorkId).Updates(map[string]interface{}{"status": 3})
+	if dengine.ExecuteSQL(&order, &source) == nil {
 		model.DB().Create(&model.CoreWorkflowDetail{
 			WorkId:   u.WorkId,
 			Username: user,
@@ -88,6 +81,30 @@ func ExecuteOrder(u *Confirm, user string) common.Resp {
 		})
 		return common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.ORDER_EXECUTE_STATE))
 	}
+	// var isCall bool
+	// if client := lib.NewRpc(); client != nil {
+	// 	if err := client.Call("Engine.Exec", &ExecArgs{
+	// 		Order:    &order,
+	// 		Rules:    *rule,
+	// 		IP:       source.IP,
+	// 		Port:     source.Port,
+	// 		Username: source.Username,
+	// 		Password: lib.Decrypt(model.JWT, source.Password),
+	// 		CA:       source.CAFile,
+	// 		Cert:     source.Cert,
+	// 		Key:      source.KeyFile,
+	// 		Message:  model.GloMessage,
+	// 	}, &isCall); err != nil {
+	// 		return common.ERR_RPC
+	// 	}
+	// 	model.DB().Create(&model.CoreWorkflowDetail{
+	// 		WorkId:   u.WorkId,
+	// 		Username: user,
+	// 		Time:     time.Now().Format("2006-01-02 15:04"),
+	// 		Action:   i18n.DefaultLang.Load(i18n.ORDER_EXECUTE_STATE),
+	// 	})
+	// 	return common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.ORDER_EXECUTE_STATE))
+	// }
 	return common.ERR_RPC
 
 }

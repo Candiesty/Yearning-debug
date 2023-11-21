@@ -19,6 +19,11 @@
           <a-form-item :label="$t('common.table.name')" name="source">
             <a-input v-model:value="dbForm.source"></a-input>
           </a-form-item>
+          <template v-if="dbForm.db_type == 1">
+            <a-form-item :label="$t('db.database')" name="data_base">
+              <a-input v-model:value="dbForm.data_base"></a-input>
+            </a-form-item>
+          </template>
           <a-form-item :label="$t('common.table.db_type')">
             {{ dbForm.db_type == 0 ? 'mysql' : 'pg' }}
           </a-form-item>
@@ -183,6 +188,7 @@
     exclude_db_list: '',
     insulate_word_list: '',
     rule_id: 0,
+    data_base: '',
   } as Source);
 
   const schemaList = ref<string[]>([]);

@@ -14,22 +14,25 @@
 package personal
 
 import (
+	"Yearning-go/src/attachment/dengine"
+	"Yearning-go/src/attachment/dmessage"
 	"Yearning-go/src/handler/common"
 	"Yearning-go/src/i18n"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"time"
+
 	"github.com/cookieY/sqlx"
 	"github.com/cookieY/yee"
 	"github.com/golang-jwt/jwt"
 	"github.com/vmihailenco/msgpack/v5"
 	"golang.org/x/net/websocket"
 	"gorm.io/gorm"
-	"io"
-	"net/http"
-	"net/url"
-	"time"
 )
 
 type queryResults struct {
@@ -105,9 +108,9 @@ func FetchQueryDatabaseInfo(c yee.Context) (err error) {
 	var u model.CoreDataSource
 
 	model.DB().Where("source_id =?", c.QueryParam("source_id")).First(&u)
-
+	dmessage.PrintV("FetchQueryDatabaseInfo", u)
 	result, err := common.ScanDataRows(u, "", "SHOW DATABASES;", "Schema", true, false)
-
+	dmessage.PrintV(result)
 	if err != nil {
 		c.Logger().Error(err.Error())
 		return c.JSON(http.StatusOK, common.ERR_COMMON_MESSAGE(err))
@@ -160,75 +163,165 @@ func SocketQueryResults(c yee.Context) (err error) {
 			core := new(queryCore)
 			var u model.CoreDataSource
 			model.DB().Where("source_id =?", args.SourceId).First(&u)
-			core.db, err = sqlx.Connect("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/?charset=utf8mb4", u.Username, lib.Decrypt(model.JWT, u.Password), u.IP, u.Port))
-			if err != nil {
-				c.Logger().Error(err)
-				_ = websocket.Message.Send(ws, lib.ToMsg(queryResults{Error: err.Error()}))
-				return
-			}
-			core.insulateWordList = u.InsulateWordList
-			core.source = u.Source
-			defer core.db.Close()
-			for {
-				if err := websocket.Message.Receive(ws, &b); err != nil {
-					if err != io.EOF {
-						c.Logger().Error(err)
-					}
-					break
-				}
-				if string(b) == "ping" {
-					_ = websocket.Message.Send(ws, lib.ToMsg(queryResults{HeartBeat: common.Pong, IsOnly: model.GloOther.Query}))
-					continue
-				}
-				if err := msgpack.Unmarshal(b, &msg.Ref); err != nil {
+			if u.DBType == 0 {
+				core.db, err = sqlx.Connect("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/?charset=utf8mb4", u.Username, lib.Decrypt(model.JWT, u.Password), u.IP, u.Port))
+				if err != nil {
 					c.Logger().Error(err)
-					break
+					_ = websocket.Message.Send(ws, lib.ToMsg(queryResults{Error: err.Error()}))
+					return
 				}
-				var d model.CoreQueryOrder
-				msg.MultiSQLRunner = []MultiSQLRunner{}
-				clock := time.Now()
-				if err := model.DB().Where("username =? AND status =?", user, 2).Last(&d).Error; errors.Is(err, gorm.ErrRecordNotFound) {
-					if err := websocket.Message.Send(ws, lib.ToMsg(queryResults{Status: true})); err != nil {
+				core.insulateWordList = u.InsulateWordList
+				core.source = u.Source
+				defer core.db.Close()
+				for {
+					if err := websocket.Message.Receive(ws, &b); err != nil {
+						if err != io.EOF {
+							c.Logger().Error(err)
+						}
+						break
+					}
+					if string(b) == "ping" {
+						_ = websocket.Message.Send(ws, lib.ToMsg(queryResults{HeartBeat: common.Pong, IsOnly: model.GloOther.Query}))
+						continue
+					}
+					if err := msgpack.Unmarshal(b, &msg.Ref); err != nil {
+						c.Logger().Error(err)
+						break
+					}
+					var d model.CoreQueryOrder
+					msg.MultiSQLRunner = []MultiSQLRunner{}
+					clock := time.Now()
+					if err := model.DB().Where("username =? AND status =?", user, 2).Last(&d).Error; errors.Is(err, gorm.ErrRecordNotFound) {
+						if err := websocket.Message.Send(ws, lib.ToMsg(queryResults{Status: true})); err != nil {
+							c.Logger().Error(err)
+						}
+						continue
+					}
+
+					if lib.TimeDifference(d.ApprovalTime) {
+						model.DB().Model(model.CoreQueryOrder{}).Where("username =?", user).Updates(&model.CoreQueryOrder{Status: 3})
+						if err := websocket.Message.Send(ws, lib.ToMsg(queryResults{Status: true})); err != nil {
+							c.Logger().Error(err)
+						}
+						continue
+					}
+
+					var queryData []*Query
+
+					//预检查，直接删了
+					// if err := msg.PreCheck(core.insulateWordList); err != nil {
+					// 	if err := websocket.Message.Send(ws, lib.ToMsg(queryResults{Error: err.Error()})); err != nil {
+					// 		c.Logger().Error(err)
+					// 	}
+					// 	continue
+					// }
+					dmessage.PrintV("core:", core)
+					dmessage.PrintV("msg:", msg)
+					msg.MultiSQLRunner = append(msg.MultiSQLRunner, MultiSQLRunner{SQL: msg.Ref.Sql})
+					for _, i := range msg.MultiSQLRunner {
+						dmessage.PrintV("run")
+						result, err := i.Run(core.db, msg.Ref.Schema)
+						if err != nil {
+							if err := websocket.Message.Send(ws, lib.ToMsg(queryResults{Error: err.Error()})); err != nil {
+								c.Logger().Error(err)
+							}
+							continue
+						}
+						dmessage.PrintV("Data:", result)
+						queryData = append(queryData, result)
+					}
+
+					queryTime := int(time.Since(clock).Seconds() * 1000)
+					go func(w string, s string, ex int) {
+						model.DB().Create(&model.CoreQueryRecord{SQL: s, WorkId: w, ExTime: ex, Time: time.Now().Format("2006-01-02 15:04"), Source: core.source, Schema: msg.Ref.Schema})
+					}(d.WorkId, msg.Ref.Sql, queryTime)
+					if err := websocket.Message.Send(ws, lib.ToMsg(queryResults{Export: d.Export == 1, Results: queryData, QueryTime: queryTime})); err != nil {
 						c.Logger().Error(err)
 					}
-					continue
 				}
-
-				if lib.TimeDifference(d.ApprovalTime) {
-					model.DB().Model(model.CoreQueryOrder{}).Where("username =?", user).Updates(&model.CoreQueryOrder{Status: 3})
-					if err := websocket.Message.Send(ws, lib.ToMsg(queryResults{Status: true})); err != nil {
-						c.Logger().Error(err)
+			} else {
+				dengine.DEC(&u)
+				db, err := dengine.SuperConnDB(&u)
+				if err != nil {
+					c.Logger().Error(err)
+					_ = websocket.Message.Send(ws, lib.ToMsg(queryResults{Error: err.Error()}))
+					return
+				}
+				sqldb, err := db.DB()
+				defer sqldb.Close()
+				for {
+					if err := websocket.Message.Receive(ws, &b); err != nil {
+						if err != io.EOF {
+							c.Logger().Error(err)
+						}
+						break
 					}
-					continue
-				}
-
-				var queryData []*Query
-
-				if err := msg.PreCheck(core.insulateWordList); err != nil {
-					if err := websocket.Message.Send(ws, lib.ToMsg(queryResults{Error: err.Error()})); err != nil {
-						c.Logger().Error(err)
+					if string(b) == "ping" {
+						_ = websocket.Message.Send(ws, lib.ToMsg(queryResults{HeartBeat: common.Pong, IsOnly: model.GloOther.Query}))
+						continue
 					}
-					continue
-				}
+					if err := msgpack.Unmarshal(b, &msg.Ref); err != nil {
+						c.Logger().Error(err)
+						break
+					}
+					var d model.CoreQueryOrder
+					// msg.MultiSQLRunner = []MultiSQLRunner{}
+					clock := time.Now()
+					if err := model.DB().Where("username =? AND status =?", user, 2).Last(&d).Error; errors.Is(err, gorm.ErrRecordNotFound) {
+						if err := websocket.Message.Send(ws, lib.ToMsg(queryResults{Status: true})); err != nil {
+							c.Logger().Error(err)
+						}
+						continue
+					}
 
-				for _, i := range msg.MultiSQLRunner {
-					result, err := i.Run(core.db, msg.Ref.Schema)
+					if lib.TimeDifference(d.ApprovalTime) {
+						model.DB().Model(model.CoreQueryOrder{}).Where("username =?", user).Updates(&model.CoreQueryOrder{Status: 3})
+						if err := websocket.Message.Send(ws, lib.ToMsg(queryResults{Status: true})); err != nil {
+							c.Logger().Error(err)
+						}
+						continue
+					}
+
+					var queryData []*Query
+
+					//预检查，直接删了
+					// if err := msg.PreCheck(core.insulateWordList); err != nil {
+					// 	if err := websocket.Message.Send(ws, lib.ToMsg(queryResults{Error: err.Error()})); err != nil {
+					// 		c.Logger().Error(err)
+					// 	}
+					// 	continue
+					// }
+
+					// msg.MultiSQLRunner = append(msg.MultiSQLRunner, MultiSQLRunner{SQL: msg.Ref.Sql})
+					// for _, i := range msg.MultiSQLRunner {
+					// 	dmessage.PrintV("run")
+					// 	result, err := i.Run(core.db, msg.Ref.Schema)
+					// 	if err != nil {
+					// 		if err := websocket.Message.Send(ws, lib.ToMsg(queryResults{Error: err.Error()})); err != nil {
+					// 			c.Logger().Error(err)
+					// 		}
+					// 		continue
+					// 	}
+					// 	dmessage.PrintV("Data:", result)
+					// 	queryData = append(queryData, result)
+					// }
+					dmessage.PrintV("Exe:")
+					result, err := ExeQuery(db, msg.Ref.Sql, queryData)
+					dmessage.PrintV(queryData)
 					if err != nil {
 						if err := websocket.Message.Send(ws, lib.ToMsg(queryResults{Error: err.Error()})); err != nil {
 							c.Logger().Error(err)
 						}
 						continue
 					}
-
 					queryData = append(queryData, result)
-				}
-
-				queryTime := int(time.Since(clock).Seconds() * 1000)
-				go func(w string, s string, ex int) {
-					model.DB().Create(&model.CoreQueryRecord{SQL: s, WorkId: w, ExTime: ex, Time: time.Now().Format("2006-01-02 15:04"), Source: core.source, Schema: msg.Ref.Schema})
-				}(d.WorkId, msg.Ref.Sql, queryTime)
-				if err := websocket.Message.Send(ws, lib.ToMsg(queryResults{Export: d.Export == 1, Results: queryData, QueryTime: queryTime})); err != nil {
-					c.Logger().Error(err)
+					queryTime := int(time.Since(clock).Seconds() * 1000)
+					go func(w string, s string, ex int) {
+						model.DB().Create(&model.CoreQueryRecord{SQL: s, WorkId: w, ExTime: ex, Time: time.Now().Format("2006-01-02 15:04"), Source: u.Source, Schema: msg.Ref.Schema})
+					}(d.WorkId, msg.Ref.Sql, queryTime)
+					if err := websocket.Message.Send(ws, lib.ToMsg(queryResults{Export: d.Export == 1, Results: queryData, QueryTime: queryTime})); err != nil {
+						c.Logger().Error(err)
+					}
 				}
 			}
 		}

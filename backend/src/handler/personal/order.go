@@ -6,6 +6,7 @@ import (
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 
@@ -44,14 +45,15 @@ func PersonalFetchMyOrder(c yee.Context) (err error) {
 					c.Logger().Error(err)
 					break
 				}
+				fmt.Printf("%+v\n", u.Expr)
 				user := token.Claims.(jwt.MapClaims)["name"].(string)
 				u.Paging().Select(common.QueryField).Query(
 					common.AccordingToAllOrderType(u.Expr.Type),
-					// common.AccordingToAllOrderState(u.Expr.Status),
+					common.AccordingToAllOrderState(u.Expr.Status),
 					common.AccordingToUsernameEqual(user),
 					common.AccordingToDate(u.Expr.Picker),
-					// common.AccordingToText(u.Expr.Text),
-					// common.AccordingToWorkId(u.Expr.WorkId),
+					common.AccordingToText(u.Expr.Text),
+					common.AccordingToWorkId(u.Expr.WorkId),
 				)
 				if err = websocket.Message.Send(ws, lib.ToJson(u.ToMessage())); err != nil {
 					c.Logger().Error(err)

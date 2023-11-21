@@ -14,6 +14,7 @@
 package model
 
 import (
+	"Yearning-go/src/attachment/dmessage"
 	"Yearning-go/src/i18n"
 	"crypto/tls"
 	"crypto/x509"
@@ -101,17 +102,36 @@ func DB() *gorm.DB {
 }
 
 func NewDBSub(dsn DSN) (*gorm.DB, error) {
-	d, err := InitDSN(dsn)
-	if err != nil {
-		return nil, err
-	}
-	db, err := gorm.Open(drive.New(drive.Config{
-		DSN:                       d,
-		DefaultStringSize:         256,   // string 类型字段的默认长度
-		SkipInitializeWithVersion: false, // 根据当前 MySQL 版本自动配置
-	}), &gorm.Config{})
-	if err != nil {
-		return nil, err
+	var (
+		d   string
+		err error
+		db  *gorm.DB
+	)
+	if dsn.DBType == 0 {
+		d, err = InitDSN(dsn)
+		if err != nil {
+			return nil, err
+		}
+		db, err = gorm.Open(drive.New(drive.Config{
+			DSN:                       d,
+			DefaultStringSize:         256,   // string 类型字段的默认长度
+			SkipInitializeWithVersion: false, // 根据当前 MySQL 版本自动配置
+		}), &gorm.Config{})
+		if err != nil {
+			return nil, err
+		}
+	} else if dsn.DBType == 1 {
+		dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%d sslmode=disable TimeZone=Asia/Shanghai", dsn.Host, dsn.Username, dsn.Password, dsn.DBName, dsn.Port)
+		dmessage.PrintV(dsn)
+		db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+			DisableForeignKeyConstraintWhenMigrating: true,
+		})
+		if err != nil {
+			dmessage.PrintV("failed to connect postgresql")
+			return nil, err
+		}
+		dmessage.PrintV("connect postgresql")
+		return db, err
 	}
 	return db, nil
 }
@@ -125,42 +145,38 @@ func Close(db *gorm.DB) error {
 }
 
 func InitDSN(dsn DSN) (string, error) {
-	if dsn.DBType == 0 {
-		isTLS := false
-		if dsn.CA != "" && dsn.Cert != "" && dsn.Key != "" {
-			isTLS = true
-			certPool := x509.NewCertPool()
-			if ok := certPool.AppendCertsFromPEM([]byte(dsn.CA)); !ok {
-				return "", fmt.Errorf("failed to append ca certs")
-			}
-			clientCert := make([]tls.Certificate, 0, 1)
-			certs, err := tls.X509KeyPair([]byte(dsn.Cert), []byte(dsn.Key))
-			if err != nil {
-				return "", err
-			}
-			clientCert = append(clientCert, certs)
-			_ = mmsql.RegisterTLSConfig("custom", &tls.Config{
-				RootCAs:            certPool,
-				Certificates:       clientCert,
-				InsecureSkipVerify: true,
-			})
+	isTLS := false
+	if dsn.CA != "" && dsn.Cert != "" && dsn.Key != "" {
+		isTLS = true
+		certPool := x509.NewCertPool()
+		if ok := certPool.AppendCertsFromPEM([]byte(dsn.CA)); !ok {
+			return "", fmt.Errorf("failed to append ca certs")
 		}
-		cfg := mmsql.Config{
-			User:                 dsn.Username,
-			Passwd:               dsn.Password,
-			Addr:                 fmt.Sprintf("%s:%d", dsn.Host, dsn.Port), //IP:PORT
-			Net:                  "tcp",
-			DBName:               dsn.DBName,
-			Loc:                  time.Local,
-			AllowNativePasswords: true,
-			ParseTime:            true,
+		clientCert := make([]tls.Certificate, 0, 1)
+		certs, err := tls.X509KeyPair([]byte(dsn.Cert), []byte(dsn.Key))
+		if err != nil {
+			return "", err
 		}
-		if isTLS == true {
-			cfg.TLSConfig = "custom"
-		}
-		return cfg.FormatDSN(), nil
-	} else if dsn.DBType == 1 {
-		DBNew_other(dsn)
+		clientCert = append(clientCert, certs)
+		_ = mmsql.RegisterTLSConfig("custom", &tls.Config{
+			RootCAs:            certPool,
+			Certificates:       clientCert,
+			InsecureSkipVerify: true,
+		})
 	}
+	cfg := mmsql.Config{
+		User:                 dsn.Username,
+		Passwd:               dsn.Password,
+		Addr:                 fmt.Sprintf("%s:%d", dsn.Host, dsn.Port), //IP:PORT
+		Net:                  "tcp",
+		DBName:               dsn.DBName,
+		Loc:                  time.Local,
+		AllowNativePasswords: true,
+		ParseTime:            true,
+	}
+	if isTLS == true {
+		cfg.TLSConfig = "custom"
+	}
+	return cfg.FormatDSN(), nil
 	return "none", nil
 }

@@ -1,17 +1,14 @@
 package db
 
 import (
+	"Yearning-go/src/attachment/dengine"
 	"Yearning-go/src/handler/common"
 	"Yearning-go/src/i18n"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	"encoding/json"
-	"fmt"
 
 	"github.com/google/uuid"
-	drive "gorm.io/driver/mysql"
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
 )
 
 type CommonDBPost struct {
@@ -23,50 +20,54 @@ type CommonDBPost struct {
 }
 
 func ConnTest(u *model.CoreDataSource) error {
-	var (
-		err error
-		dsn string
-		db  *gorm.DB
-	)
-	if u.DBType == 1 { // PostgreSql
-		DBName := "db1"
-		dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%d sslmode=disable TimeZone=Asia/Shanghai", u.IP, u.Username, u.Password, DBName, u.Port)
-		fmt.Print(dsn)
+	// var (
+	// 	err error
+	// 	dsn string
+	// 	db  *gorm.DB
+	// )
+	// if u.DBType == 1 { // PostgreSql
+	// 	DBName := "db1"
+	// 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%d sslmode=disable TimeZone=Asia/Shanghai", u.IP, u.Username, u.Password, DBName, u.Port)
+	// 	fmt.Print(dsn)
 
-		db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{
-			DisableForeignKeyConstraintWhenMigrating: true,
-		})
-		db.DB()
-		if err != nil {
-			fmt.Println("error")
-			return err
-		} else {
-			fmt.Println("connect")
-		}
+	// 	db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{
+	// 		DisableForeignKeyConstraintWhenMigrating: true,
+	// 	})
+	// 	db.DB()
+	// 	if err != nil {
+	// 		fmt.Println("error")
+	// 		return err
+	// 	} else {
+	// 		fmt.Println("connect")
+	// 	}
 
-	} else { // MySql
-		dsn, err = model.InitDSN(model.DSN{
-			Username: u.Username,
-			Password: u.Password,
-			Host:     u.IP,
-			Port:     u.Port,
-			DBName:   "",
-			CA:       u.CAFile,
-			Cert:     u.Cert,
-			Key:      u.KeyFile,
-			DBType:   u.DBType,
-		})
-		if err != nil {
-			return err
-		}
-		db, err = gorm.Open(drive.New(drive.Config{
-			DSN:                       dsn,
-			DefaultStringSize:         256,   // string 类型字段的默认长度
-			SkipInitializeWithVersion: false, // 根据当前 MySQL 版本自动配置
-		}), &gorm.Config{})
-		if err != nil {
-			return err
-		}
+	// } else { // MySql
+	// 	dsn, err = model.InitDSN(model.DSN{
+	// 		Username: u.Username,
+	// 		Password: u.Password,
+	// 		Host:     u.IP,
+	// 		Port:     u.Port,
+	// 		DBName:   "",
+	// 		CA:       u.CAFile,
+	// 		Cert:     u.Cert,
+	// 		Key:      u.KeyFile,
+	// 		DBType:   u.DBType,
+	// 	})
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	db, err = gorm.Open(drive.New(drive.Config{
+	// 		DSN:                       dsn,
+	// 		DefaultStringSize:         256,   // string 类型字段的默认长度
+	// 		SkipInitializeWithVersion: false, // 根据当前 MySQL 版本自动配置
+	// 	}), &gorm.Config{})
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// }
+	db, err := dengine.SuperConnDB(u)
+	if err != nil {
+		return err
 	}
 	d, _ := db.DB()
 	return d.Close()

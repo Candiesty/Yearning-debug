@@ -15,8 +15,8 @@ const i18n = createI18n({
   legacy: false,
   globalInjection: true,
   silentTranslationWarn: true,
-  locale: 'en_US',
-  fallbackLocale: 'en_US',
+  locale: 'zh_CN',
+  fallbackLocale: 'zh_CN',
   messages,
 });
 

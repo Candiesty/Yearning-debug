@@ -1,4 +1,5 @@
 export default {
+  'db.database': '库名称',
   'db.port': '端口',
   'db.kind': '连接模式',
   'db.addr': '地址',

@@ -50,11 +50,11 @@ func (u *_FetchBind) FetchTableFieldsOrIndexes() error {
 		CA:       s.CAFile,
 		Cert:     s.Cert,
 		Key:      s.KeyFile,
+		DBType:   s.DBType,
 	})
 	if err != nil {
 		return err
 	}
-
 	defer model.Close(db)
 
 	if err := db.Raw(fmt.Sprintf("SHOW FULL FIELDS FROM `%s`.`%s`", u.DataBase, u.Table)).Scan(&u.Rows).Error; err != nil {

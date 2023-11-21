@@ -53,15 +53,15 @@
             >
             </a-textarea>
           </a-form-item>
-          <a-form-item :label="$t('order.profile.timing')">
+          <!-- <a-form-item :label="$t('order.profile.timing')">
             <a-date-picker show-time @ok="delayTime" />
-          </a-form-item>
-          <a-form-item :label="$t('order.profile.roll')">
+          </a-form-item> -->
+          <!-- <a-form-item :label="$t('order.profile.roll')">
             <a-radio-group v-model:value="orderItems.backup" name="radioGroup">
               <a-radio :value="1">{{ $t('common.yes') }}</a-radio>
               <a-radio :value="0">{{ $t('common.no') }}</a-radio>
             </a-radio-group>
-          </a-form-item>
+          </a-form-item> -->
           <a-form-item :label="$t('common.action')">
             <a-space>
               <a-button :loading="loadingTblBtn" @click="fetchTableArch">{{
@@ -283,6 +283,8 @@
     formRef.value
       .validate()
       .then(async () => {
+        orderItems.backup = 0
+        console.log(orderItems)
         let wrapper = Object.assign({}, orderItems);
         wrapper.sql = editor.value.GetValue();
         orderProfileArch.timeline.forEach((item) => {

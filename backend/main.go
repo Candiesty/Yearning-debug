@@ -15,8 +15,10 @@ package main
 
 import (
 	"Yearning-go/cmd"
+	"log"
 )
 
 func main() {
+	log.SetFlags(log.Lshortfile | log.LstdFlags)
 	cmd.Command()
 }

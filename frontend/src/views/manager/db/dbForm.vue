@@ -20,19 +20,24 @@
     <a-form-item :label="$t('common.table.name')" name="source">
       <a-input v-model:value="dbForm.source"></a-input>
     </a-form-item>
+    <template v-if="dbForm.db_type == 1">
+      <a-form-item :label="$t('db.database')" name="data_base">
+        <a-input v-model:value="dbForm.data_base"></a-input>
+      </a-form-item>
+    </template>
     <a-form-item :label="$t('db.addr')" name="ip">
       <a-input v-model:value="dbForm.ip"></a-input>
     </a-form-item>
     <a-form-item :label="$t('db.port')" name="port">
       <a-input-number v-model:value="dbForm.port"></a-input-number>
     </a-form-item>
-    <a-form-item :label="$t('db.kind')">
+    <!-- <a-form-item :label="$t('db.kind')">
       <a-switch
         v-model:checked="checked"
         :checked-children="$t('db.ssl')"
         :un-checked-children="$t('user.password')"
       />
-    </a-form-item>
+    </a-form-item> -->
     <template v-if="checked">
       <a-form-item :label="$t('db.ssl.ca')">
         <a-button size="small" @click="open.ca = true">
@@ -162,6 +167,7 @@
   };
 
   const rules = {
+    data_base: [{required: false}],
     idc: [{ required: true, message: t('db.check.env'), trigger: 'change' }],
     source: [
       { required: true, message: t('db.check.name'), trigger: 'blur' },
@@ -243,6 +249,7 @@
     cert: '',
     key_file: '',
     db_type: 0,
+    data_base: '',
   } as Source);
 
   const formRef = ref();

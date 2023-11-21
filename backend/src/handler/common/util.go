@@ -1,12 +1,14 @@
 package common
 
 import (
+	"Yearning-go/src/attachment/dmessage"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	"errors"
 	"fmt"
-	"github.com/cookieY/yee/logger"
 	"strings"
+
+	"github.com/cookieY/yee/logger"
 )
 
 func unifiedLabel(col []string) []any {
@@ -24,16 +26,27 @@ func ScanDataRows(s model.CoreDataSource, database, sql, meta string, isQuery bo
 	if ps == "" {
 		return res, errors.New("连接失败,密码解析错误！")
 	}
-
+	if database != "" {
+		s.DataBase = database
+	}
+	if sql == "SHOW DATABASES;" && s.DBType != 0 {
+		res.Results = append(res.Results, s.DataBase)
+		res.QueryList = append(res.QueryList, map[string]interface{}{"title": s.DataBase, "key": checkMeta(s.DataBase, database, meta), "meta": meta, "isLeaf": isLeaf})
+		return res, nil
+	}
+	if sql == "SHOW TABLES;" && s.DBType == 1 {
+		sql = "select tablename from pg_tables where schemaname='public'"
+	}
 	db, err := model.NewDBSub(model.DSN{
 		Username: s.Username,
 		Password: ps,
 		Host:     s.IP,
 		Port:     s.Port,
-		DBName:   database,
+		DBName:   s.DataBase,
 		CA:       s.CAFile,
 		Cert:     s.Cert,
 		Key:      s.KeyFile,
+		DBType:   s.DBType,
 	})
 	if err != nil {
 		return res, err
@@ -68,6 +81,7 @@ func ScanDataRows(s model.CoreDataSource, database, sql, meta string, isQuery bo
 			res.Results = append(res.Results, j)
 		}
 	}
+	dmessage.PrintV(res)
 	return res, nil
 }
 
@@ -81,6 +95,9 @@ func checkMeta(s, database, flag string) string {
 func Highlight(s *model.CoreDataSource, isField string, dbName string) []map[string]string {
 	ps := lib.Decrypt(model.JWT, s.Password)
 	var list []map[string]string
+	if s.DBType != 0 {
+		return list
+	}
 	db, err := model.NewDBSub(model.DSN{
 		Username: s.Username,
 		Password: ps,

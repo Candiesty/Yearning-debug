@@ -131,6 +131,7 @@ type CoreDataSource struct {
 	KeyFile          string `gorm:"type:longtext;default ''" json:"key_file"`
 	DBType           int    `gorm:"type:int(5);not null;default 0" json:"db_type"` // 0 mysql 1 pg
 	RuleId           int    `gorm:"type:int(100);not null;default 0" json:"rule_id"`
+	DataBase         string `gorm:"type:longtext;default ''" json:"data_base"`
 }
 
 type CoreGrained struct {

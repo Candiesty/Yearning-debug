@@ -14,6 +14,7 @@
 package fetch
 
 import (
+	"Yearning-go/src/attachment/dmessage"
 	"Yearning-go/src/engine"
 	"Yearning-go/src/handler/common"
 	"Yearning-go/src/handler/manage/tpl"
@@ -124,6 +125,7 @@ func FetchAuditSteps(c yee.Context) (err error) {
 	for _, v := range whoIsAuditor {
 		steps = append(steps, StepInfo{Tpl: v})
 	}
+	dmessage.PrintV(s)
 	for i, v := range s {
 		steps[i].CoreWorkflowDetail = v
 	}
@@ -139,7 +141,6 @@ func FetchHighLight(c yee.Context) (err error) {
 }
 
 func FetchBase(c yee.Context) (err error) {
-
 	u := new(_FetchBind)
 	if err := c.Bind(u); err != nil {
 		return err
@@ -153,7 +154,7 @@ func FetchBase(c yee.Context) (err error) {
 
 	model.DB().Where("source_id =?", unescape).First(&s)
 
-	result, err := common.ScanDataRows(s, "", "SHOW DATABASES;", "Schema", false, false)
+	result, err := common.ScanDataRows(s, s.DataBase, "SHOW DATABASES;", "Schema", false, false)
 	if err != nil {
 		c.Logger().Error(err.Error())
 		return c.JSON(http.StatusOK, common.ERR_COMMON_MESSAGE(err))
@@ -251,6 +252,7 @@ func FetchSQLTest(c yee.Context) (err error) {
 	// return c.JSON(http.StatusOK, common.ERR_RPC)
 }
 
+// 获取详细信息
 func FetchOrderDetailList(c yee.Context) (err error) {
 	expr := new(PageSizeRef)
 	if err := c.Bind(expr); err != nil {

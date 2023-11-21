@@ -1,6 +1,7 @@
 package personal
 
 import (
+	"Yearning-go/src/attachment/dmessage"
 	"Yearning-go/src/engine"
 	"Yearning-go/src/i18n"
 	"Yearning-go/src/lib"
@@ -8,8 +9,10 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/cookieY/sqlx"
 	"strings"
+
+	"github.com/cookieY/sqlx"
+	"gorm.io/gorm"
 )
 
 const (
@@ -50,6 +53,7 @@ type QueryArgs struct {
 }
 
 func (q *QueryDeal) PreCheck(insulateWordList string) error {
+
 	var rs []engine.Record
 	if client := lib.NewRpc(); client != nil {
 		if err := client.Call("Engine.Query", &QueryArgs{
@@ -68,6 +72,45 @@ func (q *QueryDeal) PreCheck(insulateWordList string) error {
 		return nil
 	}
 	return errors.New(ER_RPC)
+}
+
+func UnifiedLabel(col []string) []any {
+	var s []any
+	for i := 0; i < len(col); i++ {
+		var t string
+		s = append(s, &t)
+	}
+	return s
+}
+
+func ExeQuery(db *gorm.DB, sql string, res []*Query) (*Query, error) {
+	rows, err := db.Raw(sql).Rows()
+	if err != nil {
+		return nil, err
+	}
+	col, err := rows.Columns()
+	if err != nil {
+		return nil, err
+	}
+	q := new(Query)
+	for cv := range col {
+		q.Field = append(q.Field, map[string]interface{}{"title": col[cv], "dataIndex": col[cv], "width": 200, "resizable": true, "ellipsis": true})
+	}
+	_tmp := UnifiedLabel(col)
+	for rows.Next() {
+		rows.Scan(_tmp...)
+		var tmp = make(map[string]interface{})
+		for i := 0; i < len(col); i++ {
+			j := *_tmp[i].(*string)
+			j = strings.TrimRight(j, " ")
+			tmp[col[i]] = j
+		}
+		q.Data = append(q.Data, tmp)
+	}
+	res = append(res, q)
+	q.Field[0]["fixed"] = "left"
+	dmessage.PrintV(q, col, res)
+	return q, nil
 }
 
 func (m *MultiSQLRunner) Run(db *sqlx.DB, schema string) (*Query, error) {

@@ -1,4 +1,5 @@
 export default {
+  'db.database': 'Database',
   'db.port': 'Port',
   'db.kind': 'Mode',
   'db.addr': 'Addr',

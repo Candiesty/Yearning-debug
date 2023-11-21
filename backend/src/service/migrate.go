@@ -20,10 +20,11 @@ import (
 	"Yearning-go/src/model"
 	"encoding/json"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/gookit/gcli/v3/interact"
 	"os"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/gookit/gcli/v3/interact"
 )
 
 func DataInit(o *engine.AuditRole, other *model.Other, ldap *model.Ldap, message *model.Message, a *model.PermissionList) {
@@ -37,7 +38,7 @@ func DataInit(o *engine.AuditRole, other *model.Other, ldap *model.Ldap, message
 	model.DB().Debug().Create(&model.CoreAccount{
 		Username:   "admin",
 		RealName:   "超级管理员",
-		Password:   lib.DjangoEncrypt("Yearning_admin", string(lib.GetRandom())),
+		Password:   lib.DjangoEncrypt("123456", string(lib.GetRandom())),
 		Department: "DBA",
 		Email:      "",
 	})

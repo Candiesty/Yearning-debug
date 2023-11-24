@@ -1,6 +1,7 @@
 package common
 
 import (
+	"Yearning-go/src/attachment/dengine"
 	"Yearning-go/src/attachment/dmessage"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
@@ -95,18 +96,18 @@ func checkMeta(s, database, flag string) string {
 func Highlight(s *model.CoreDataSource, isField string, dbName string) []map[string]string {
 	ps := lib.Decrypt(model.JWT, s.Password)
 	var list []map[string]string
-	if s.DBType != 0 {
-		return list
-	}
+
+	dmessage.PrintV("Highlight", s)
 	db, err := model.NewDBSub(model.DSN{
 		Username: s.Username,
 		Password: ps,
 		Host:     s.IP,
 		Port:     s.Port,
-		DBName:   "",
+		DBName:   s.DataBase,
 		CA:       s.CAFile,
 		Cert:     s.Cert,
 		Key:      s.KeyFile,
+		DBType:   s.DBType,
 	})
 	if err != nil {
 		logger.DefaultLogger.Error(err)
@@ -117,6 +118,21 @@ func Highlight(s *model.CoreDataSource, isField string, dbName string) []map[str
 		_ = model.Close(db)
 	}()
 
+	if s.DBType != 0 {
+		if isField == "true" {
+			res := dengine.FetchTables(db)
+			for _, v := range res {
+				list = append(list, map[string]string{"vl": v, "meta": "Table"})
+				tmp := dengine.FetchField(v, db)
+				for _, w := range tmp {
+					list = append(list, map[string]string{"vl": w, "meta": "Fields"})
+				}
+			}
+		} else {
+			list = append(list, map[string]string{"vl": s.DataBase, "meta": "Schema"})
+		}
+		return list
+	}
 	var highlight string
 
 	excludeDbList := strings.Split(s.ExcludeDbList, ",")
@@ -148,7 +164,7 @@ func Highlight(s *model.CoreDataSource, isField string, dbName string) []map[str
 			list = append(list, map[string]string{"vl": highlight, "meta": "Schema"})
 		}
 	}
-
+	dmessage.PrintV("Highligth res:", list)
 	return list
 }
 func SuccessPayload(payload interface{}) Resp {

@@ -1,6 +1,8 @@
 package fetch
 
 import (
+	"Yearning-go/src/attachment/dengine"
+	"Yearning-go/src/attachment/dmessage"
 	"Yearning-go/src/handler/common"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
@@ -57,12 +59,24 @@ func (u *_FetchBind) FetchTableFieldsOrIndexes() error {
 	}
 	defer model.Close(db)
 
-	if err := db.Raw(fmt.Sprintf("SHOW FULL FIELDS FROM `%s`.`%s`", u.DataBase, u.Table)).Scan(&u.Rows).Error; err != nil {
-		return err
-	}
+	if s.DBType == 0 {
+		if err := db.Raw(fmt.Sprintf("SHOW FULL FIELDS FROM `%s`.`%s`", u.DataBase, u.Table)).Scan(&u.Rows).Error; err != nil {
+			return err
+		}
 
-	if err := db.Raw(fmt.Sprintf("SHOW INDEX FROM `%s`.`%s`", u.DataBase, u.Table)).Scan(&u.Idx).Error; err != nil {
-		return err
+		if err := db.Raw(fmt.Sprintf("SHOW INDEX FROM `%s`.`%s`", u.DataBase, u.Table)).Scan(&u.Idx).Error; err != nil {
+			return err
+		}
+	} else if s.DBType == 1 {
+		res, l := dengine.FetchTable(u.Table, db)
+		for i := 0; i < len(res)/l; i++ {
+			var tmp = new(common.FieldInfo)
+			tmp.Field = res[4*i]
+			tmp.Type = res[4*i+1]
+			tmp.Null = res[4*i+2]
+			u.Rows = append(u.Rows, *tmp)
+		}
+		dmessage.PrintV(u)
 	}
 	return nil
 }

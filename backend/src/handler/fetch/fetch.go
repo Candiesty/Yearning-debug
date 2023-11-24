@@ -137,6 +137,7 @@ func FetchAuditSteps(c yee.Context) (err error) {
 func FetchHighLight(c yee.Context) (err error) {
 	var s model.CoreDataSource
 	model.DB().Where("source_id =?", c.QueryParam("source_id")).First(&s)
+	dmessage.PrintV(s)
 	return c.JSON(http.StatusOK, common.SuccessPayload(common.Highlight(&s, c.QueryParam("is_field"), c.QueryParam("schema"))))
 }
 
@@ -203,6 +204,8 @@ func FetchTableInfo(c yee.Context) (err error) {
 		if err := u.FetchTableFieldsOrIndexes(); err != nil {
 			c.Logger().Critical(err.Error())
 		}
+		dmessage.PrintV(u)
+		// u.Idx = nil
 		return c.JSON(http.StatusOK, common.SuccessPayload(map[string]interface{}{"rows": u.Rows, "idx": u.Idx}))
 	}
 	return c.JSON(http.StatusOK, common.ERR_COMMON_MESSAGE(errors.New(i18n.DefaultLang.Load(i18n.INFO_LIBRARY_NAME_TABLE_NAME))))
